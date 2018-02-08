@@ -104,6 +104,7 @@ class Dfg:
 			self.numsucc[x] = len(self.successors[x])
 
 
+
 	def topologicalSortUtil(self, v, visited, stack, graph):
 		visited[v] = True
 		if v in graph.keys():
@@ -169,14 +170,36 @@ class Dfg:
 	def printNeurons(self, neurons):
 
 		l = self.number_of_operations+1 # for 1-indexing Convenience
-		for i in range(0,self.control_steps):
-			for L in range(1, l):
-				J = self.type_of_operation[L]
-				J_val = self.type_of_operators[J]
+	
+		for L in range(1, l):
+			J = self.type_of_operation[L]
+			J_val = self.type_of_operators[J]
+			asap_time = self.asap_schedule[L]
+			alap_time = self.alap_schedule[L]
+
+			for i in range(asap_time, alap_time+1):
 				for K in range(self.max_j[J]):
 
-					print "Here ( ",i,", ",J_val,", ",K,", ",L, ") has a val ", neurons[i][J_val][K][L] 
+					print "( ",i,", ",J_val,", ",K,", ",L, ") has a val ", neurons[i][J_val][K][L] 
 
+	def printOutput(self, output):
+
+		l = self.number_of_operations+1
+		for oper in range(1, l):
+			flag = False
+			asap_time = self.asap_schedule[oper]
+			alap_time = self.alap_schedule[oper]
+
+			for i in range(asap_time, alap_time+1):
+				J = self.type_of_operation[oper]
+				J_val = self.type_of_operators[J]
+				for K in range(self.max_j[J]):
+					if output[i][J_val][K][oper] == 1:
+						flag = True
+						print oper, i, K
+						break
+				if flag == True:
+					break
 
 	def run(self):
 		print '*********************  Neural Network Scheduling  ************************'
@@ -188,117 +211,141 @@ class Dfg:
 		print 'Initializing (',i,j,k,l,')'
 		neurons = np.random.randint(low=-20, high=3, size=(i,j,k,l))
 		
+
 		C1 = 1
 		C2 = 1
 		C3 = 1
 		Umax = 20
 		Umin = -10
 		ite = 1
+		list_of_delta_neurons = []
 
 		while(True):
 			print 'Iteration ', ite
 			# Evaluate Outputs
 
-			for i in range(0,self.control_steps):
-				for L in range(1, l):
-					J = self.type_of_operation[L]
-					J_val = self.type_of_operators[J]
-
-					for K in range(self.max_j[J]):
-
-						# For each Neuron
-						maxSoFar = -50
-						address = []
-
-						for T in range(0, self.control_steps):
-							for Q in range(self.max_j[J]):
-								if neurons[T][J_val][Q][L] > 0 and neurons[T][J_val][Q][L] > maxSoFar:
-									maxSoFar =  neurons[T][J_val][Q][L]
-									address.append(T)
-									address.append(Q)
-
-						if len(address) == 2 and address[0] == i and address[1] == K:
-							neurons[i][J_val][K][L] = 1
-						else:
-							neurons[i][J_val][K][L] = 0
-
-						
+			output = np.random.randint(low=0, high=1, size=(self.control_steps+1,j,k,l))
 			self.printNeurons(neurons)
+
+			for L in range(1, l):
+
+				asap_time = self.asap_schedule[L]
+				alap_time = self.alap_schedule[L]
+				J = self.type_of_operation[L]
+				J_val = self.type_of_operators[J]
+				
+				maxSoFar = -50
+				address = []
+
+				for T in range(asap_time, alap_time+1):
+					for Q in range(self.max_j[J]):
+						if neurons[T][J_val][Q][L] > maxSoFar:
+							maxSoFar =  neurons[T][J_val][Q][L]
+							address = []
+							address.append(T)
+							address.append(Q)
+
+				output[address[0]][J_val][address[1]][L] = 1
 			
+			self.printNeurons(output)
+
 			# Update Neurons 
 			# Calculate /\ U(i,j,k,l)
 			list_of_delta_neurons = []
-			for i in range(0,self.control_steps):
 				
-				for L in range(1,l):
-					J = self.type_of_operation[L]
-					J_val = self.type_of_operators[J]
+			for L in range(1,l):
+	
+				asap_time = self.asap_schedule[L]
+				alap_time = self.alap_schedule[L]
+				J = self.type_of_operation[L]
+				J_val = self.type_of_operators[J]
 
+				for i in range(asap_time, alap_time+1):
+		
 					for K in range(self.max_j[J]):
 
+						print 'Working for operation ', L, ' time: ', i,', FU_type: ',K
+
 						inner_term = 0
-					
 						for P in range(len(self.predecessors[L])):
+
 							pred_oper =  self.predecessors[L][P]
 							pred_operator = self.type_of_operation[pred_oper]
 							type_of_pred_oper = self.type_of_operators[pred_operator]
 							ap = self.asap_schedule[pred_oper]
 							Ap = min(self.alap_schedule[pred_oper], i-1)
 
+							print 'For Pred', pred_oper, 'Running from ', ap,' to ', Ap
+
 							for Q in range(self.max_j[pred_operator]):
 								for T in range(ap, Ap+1):
-									if neurons[T][type_of_pred_oper][Q][P] == 1 or neurons[T][type_of_pred_oper][Q][P] == 0:
-										inner_term = inner_term + neurons[T][type_of_pred_oper][Q][P]
+									inner_term = inner_term + output[T][type_of_pred_oper][Q][pred_oper]
+
 
 						first_term = C1*(self.numpreds[L]-inner_term)
 
 						inner_term = 0
-					
+						
 						for S in range(len(self.successors[L])):
+
 							succ_oper = self.successors[L][S]
 							succ_operator = self.type_of_operation[succ_oper]
 							type_of_succ_oper = self.type_of_operators[succ_operator]
-							a_s = self.alap_schedule[succ_oper]
-							As = max(self.asap_schedule[succ_oper], i+1)
+							As = self.alap_schedule[succ_oper]
+							a_s = max(self.asap_schedule[succ_oper], i+1)
+
+							print 'For Successor', succ_oper, ' Running from ', a_s,' to ', As
 
 							for Q  in range(self.max_j[succ_operator]):
 								for T in range(a_s, As+1):
-									if neurons[T][type_of_succ_oper][Q][S] == 1 or neurons[T][type_of_succ_oper][Q][S] == 0:
-										inner_term = inner_term + neurons[T][type_of_succ_oper][Q][S]
+									inner_term = inner_term + output[T][type_of_succ_oper][Q][succ_oper]
 
 						second_term = C2*(self.numsucc[L] - inner_term)
 
 						inner_term = -1
-						for H in range(1,l):
-							inner_term = inner_term + neurons[i][self.type_of_operators[J]][K][H]
-						
-						third_term = C3*inner_term
+						#ww = raw_input()
 
+						for H in range(1,l):
+							inner_term = inner_term + output[i][J_val][K][H]
+
+
+						third_term = C3*inner_term
+						
 						delta_neuron = (first_term + second_term + third_term)*-1
 						
-						old_value = neurons[i][J_val][K][L]
+						old_val = neurons[i][J_val][K][L]
 						neurons[i][J_val][K][L] = neurons[i][J_val][K][L]+delta_neuron
 
 						if neurons[i][J_val][K][L] > Umax:
 							neurons[i][J_val][K][L] = Umax
-							delta_neuron = Umax - old_value
+							delta_neuron = Umax - old_val
 						elif neurons[i][J_val][K][L] < Umin:
 							neurons[i][J_val][K][L] = Umin
-							delta_neuron = old_value - Umin
+							delta_neuron = Umin - old_val
 
 						list_of_delta_neurons.append(delta_neuron)
 
 
 			print list_of_delta_neurons
-			count = 0
-			for dn in list_of_delta_neurons:
-				if dn == 0:
-					count = count + 1
 
-			if count == len(list_of_delta_neurons):
-				break
+
+			count = 0
+			if ite>1:
+				for dn in list_of_delta_neurons:
+					if dn == 0:
+						count = count + 1
+
+				if count == len(list_of_delta_neurons):
+					break
 
 			ite = ite+1
+
+		#self.printNeurons(output)
+		self.printOutput(output)		
+
+
+
+
 
 
 control_steps = int(raw_input('Enter Control Steps(HW Constraint) : '))
@@ -306,10 +353,12 @@ f = open("max_j.txt", "r")
 max_j = dict()
 for line in f:
 	vals = line.strip().split(',')
-	max_j[vals[0]] = int(vals[1])
+	max_j[vals[0]] = int(vals[1])	
 
-g = Dfg(11, control_steps, max_j)
-f = open("sampleDFG.txt", "r")
+opers = int(raw_input("Enter no of nodes: "))
+g = Dfg(opers, control_steps, max_j)
+filename = raw_input("Enter filename: ")
+f = open(filename, "r")
 for line in f:
 	vals = line.strip().split(',')
 	g.addEdge(int(vals[0]), int(vals[1]), int(vals[2]), vals[3])
