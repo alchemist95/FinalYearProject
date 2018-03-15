@@ -84,7 +84,7 @@ class Dfg:
 				self.dfs(node,subtree, graph, params, type_of_fun)
 				if type_of_fun == 0 and node != 0:
 					subtree.append(node)
-				if type_of_fun == 1 and node != 12:
+				if type_of_fun == 1 and node != self.sink:
 					subtree.append(node)
 				for x in subtree:
 					final.append(x)	
@@ -211,6 +211,7 @@ class Dfg:
 		print 'Initializing (',i,j,k,l,')'
 		neurons = np.random.randint(low=-20, high=3, size=(i,j,k,l))
 		
+		sample_input = raw_input("Press to continue")
 
 		C1 = 1
 		C2 = 1
@@ -289,6 +290,7 @@ class Dfg:
 						for S in range(len(self.successors[L])):
 
 							succ_oper = self.successors[L][S]
+							
 							succ_operator = self.type_of_operation[succ_oper]
 							type_of_succ_oper = self.type_of_operators[succ_operator]
 							As = self.alap_schedule[succ_oper]
@@ -349,7 +351,9 @@ class Dfg:
 
 
 control_steps = int(raw_input('Enter Control Steps(HW Constraint) : '))
-f = open("max_j.txt", "r")
+
+const_filename = raw_input("Enter Constraint filename: ")
+f = open(const_filename, "r")
 max_j = dict()
 for line in f:
 	vals = line.strip().split(',')
